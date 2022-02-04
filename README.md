@@ -1,5 +1,16 @@
 # Super Mario 64
 
+## Modifications
+You can now ground-pound while making a long-jump or a dive.
+
+After you've ground-pounded, you can press A to make a "air-triple-jump".
+
+Or you can make a "air-dive" by pressing B after you've ground-pounded, and after that air-dive you can make another ground-pound and end this combo with an air-triple-jump.
+
+You can also make the combos above after a wall- jump to climb up walls!
+
+
+
 - This repo contains a full decompilation of Super Mario 64 (J), (U), (E), and (SH).
 - Naming and documentation of the source code and data structures are in progress.
 
