@@ -3,11 +3,13 @@
 ## Modifications
 You can now ground-pound while making a long-jump or a dive.
 
-After you've ground-pounded, you can press A to make a "air-triple-jump".
+When you ground-pound and you are still in the air, you can press
+A to make a "air-triple-jump".
 
-Or you can make a "air-dive" by pressing B after you've ground-pounded, and after that air-dive you can make another ground-pound and end this combo with an air-triple-jump.
+Or you can make a "air-dive" by pressing B when you ground-pound and you are still in the air. And after that air-dive you
+can make another ground-pound and end this combo with an air-triple-jump.
 
-You can also make the combos above after a wall- jump to climb up walls!
+You can also make the combos after a wall-jump to climb up walls!
 
 
 
