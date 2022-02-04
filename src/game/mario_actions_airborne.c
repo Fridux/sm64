@@ -14,6 +14,11 @@
 #include "save_file.h"
 #include "rumble_init.h"
 
+s32 normal_triple_jump = FALSE;
+s32 another_ground_pound = TRUE;
+s32 air_triple_jump = FALSE;
+s32 another_dive = TRUE;
+
 void play_flip_sounds(struct MarioState *m, s16 frame1, s16 frame2, s16 frame3) {
     s32 animFrame = m->marioObj->header.gfx.animInfo.animFrame;
     if (animFrame == frame1 || animFrame == frame2 || animFrame == frame3) {
@@ -444,6 +449,8 @@ u32 common_air_action_step(struct MarioState *m, u32 landAction, s32 animation, 
 }
 
 s32 act_jump(struct MarioState *m) {
+    normal_triple_jump = FALSE;
+    
     if (check_kick_or_dive_in_air(m)) {
         return TRUE;
     }
@@ -462,6 +469,8 @@ s32 act_double_jump(struct MarioState *m) {
     s32 animation = (m->vel[1] >= 0.0f)
         ? MARIO_ANIM_DOUBLE_JUMP_RISE
         : MARIO_ANIM_DOUBLE_JUMP_FALL;
+
+    normal_triple_jump = TRUE;
 
     if (check_kick_or_dive_in_air(m)) {
         return TRUE;
@@ -482,11 +491,11 @@ s32 act_triple_jump(struct MarioState *m) {
         return set_mario_action(m, ACT_SPECIAL_TRIPLE_JUMP, 0);
     }
 
-    if (m->input & INPUT_B_PRESSED) {
+    if (m->input & INPUT_B_PRESSED && normal_triple_jump == TRUE) {
         return set_mario_action(m, ACT_DIVE, 0);
     }
 
-    if (m->input & INPUT_Z_PRESSED) {
+    if (m->input & INPUT_Z_PRESSED && normal_triple_jump == TRUE) {
         return set_mario_action(m, ACT_GROUND_POUND, 0);
     }
 
@@ -644,6 +653,13 @@ s32 act_long_jump(struct MarioState *m) {
         m->actionState = 1;
     }
 
+
+    if (m->input & INPUT_Z_PRESSED)
+    {
+        set_mario_action(m, ACT_GROUND_POUND, 0);
+        return FALSE;
+    }
+
     common_air_action_step(m, ACT_LONG_JUMP_LAND, animation, AIR_STEP_CHECK_LEDGE_GRAB);
 #if ENABLE_RUMBLE
     if (m->action == ACT_LONG_JUMP_LAND) {
@@ -723,6 +739,14 @@ s32 act_twirling(struct MarioState *m) {
 }
 
 s32 act_dive(struct MarioState *m) {
+    if (m->input & INPUT_Z_PRESSED && another_ground_pound == TRUE)
+    {  
+        another_ground_pound = FALSE;
+        another_dive = FALSE;
+
+        return set_mario_action(m, ACT_GROUND_POUND, 0);
+    }
+    
     if (m->actionArg == 0) {
         play_mario_sound(m, SOUND_ACTION_THROW, SOUND_MARIO_HOOHOO);
     } else {
@@ -753,6 +777,8 @@ s32 act_dive(struct MarioState *m) {
 
         case AIR_STEP_LANDED:
             if (should_get_stuck_in_ground(m) && m->faceAngle[0] == -0x2AAA) {
+                another_ground_pound = TRUE;
+                another_dive = TRUE;
 #if ENABLE_RUMBLE
                 queue_rumble_data(5, 80);
 #endif
@@ -766,14 +792,20 @@ s32 act_dive(struct MarioState *m) {
             } else if (!check_fall_damage(m, ACT_HARD_FORWARD_GROUND_KB)) {
                 if (m->heldObj == NULL) {
                     set_mario_action(m, ACT_DIVE_SLIDE, 0);
+                    another_ground_pound = TRUE;
+                    another_dive = TRUE;
                 } else {
                     set_mario_action(m, ACT_DIVE_PICKING_UP, 0);
+                    another_ground_pound = TRUE;
+                    another_dive = TRUE;
                 }
             }
             m->faceAngle[0] = 0;
             break;
 
         case AIR_STEP_HIT_WALL:
+            another_ground_pound = TRUE;
+            another_dive = TRUE;
             mario_bonk_reflection(m, TRUE);
             m->faceAngle[0] = 0;
 
@@ -787,6 +819,8 @@ s32 act_dive(struct MarioState *m) {
 
         case AIR_STEP_HIT_LAVA_WALL:
             lava_boost_on_wall(m);
+            another_ground_pound = TRUE;
+            another_dive = TRUE;
             break;
     }
 
@@ -919,12 +953,45 @@ s32 act_ground_pound(struct MarioState *m) {
     u32 stepResult;
     f32 yOffset;
 
+    if (m->input & INPUT_B_PRESSED && another_dive == TRUE)
+    {
+        set_mario_action(m, ACT_DIVE, 0);
+        m->vel[1] = 30.0f;
+        m->forwardVel = 40.0f;
+        m->faceAngle[1] = m->intendedYaw;
+        another_dive = FALSE;
+
+        return FALSE;
+    }
+
+    if (m->input & INPUT_A_PRESSED)
+    {
+        set_mario_action(m, ACT_TRIPLE_JUMP, 0);
+        
+        m->vel[1] = 50.0f;
+        m->forwardVel = 20.0f;
+        
+        m->faceAngle[1] = m->intendedYaw;
+        normal_triple_jump = FALSE;
+        
+        air_triple_jump = TRUE;
+        
+        another_ground_pound = TRUE;
+        another_dive = TRUE;
+
+        return FALSE;
+    }
+
     play_sound_if_no_flag(m, SOUND_ACTION_THROW, MARIO_ACTION_SOUND_PLAYED);
 
-    if (m->actionState == 0) {
-        if (m->actionTimer < 10) {
+    if (m->actionState == 0) 
+    {
+        if (m->actionTimer < 10) 
+        {
             yOffset = 20 - 2 * m->actionTimer;
-            if (m->pos[1] + yOffset + 160.0f < m->ceilHeight) {
+
+            if (m->pos[1] + yOffset + 160.0f < m->ceilHeight) 
+            {
                 m->pos[1] += yOffset;
                 m->peakHeight = m->pos[1];
                 vec3f_copy(m->marioObj->header.gfx.pos, m->pos);
@@ -936,21 +1003,28 @@ s32 act_ground_pound(struct MarioState *m) {
 
         set_mario_animation(m, m->actionArg == 0 ? MARIO_ANIM_START_GROUND_POUND
                                                  : MARIO_ANIM_TRIPLE_JUMP_GROUND_POUND);
-        if (m->actionTimer == 0) {
+        if (m->actionTimer == 0) 
+        {
             play_sound(SOUND_ACTION_SPIN, m->marioObj->header.gfx.cameraToObject);
         }
 
         m->actionTimer++;
-        if (m->actionTimer >= m->marioObj->header.gfx.animInfo.curAnim->loopEnd + 4) {
+        
+        if (m->actionTimer >= m->marioObj->header.gfx.animInfo.curAnim->loopEnd + 4) 
+        {
             play_sound(SOUND_MARIO_GROUND_POUND_WAH, m->marioObj->header.gfx.cameraToObject);
             m->actionState = 1;
         }
-    } else {
+    } 
+    else 
+    {
         set_mario_animation(m, MARIO_ANIM_GROUND_POUND);
 
         stepResult = perform_air_step(m, 0);
-        if (stepResult == AIR_STEP_LANDED) {
-            if (should_get_stuck_in_ground(m)) {
+        if (stepResult == AIR_STEP_LANDED) 
+        {
+            if (should_get_stuck_in_ground(m)) 
+            {
 #if ENABLE_RUMBLE
                 queue_rumble_data(5, 80);
 #endif
@@ -961,17 +1035,29 @@ s32 act_ground_pound(struct MarioState *m) {
 #endif
                 m->particleFlags |= PARTICLE_MIST_CIRCLE;
                 set_mario_action(m, ACT_BUTT_STUCK_IN_GROUND, 0);
-            } else {
+            } 
+            else 
+            {
                 play_mario_heavy_landing_sound(m, SOUND_ACTION_TERRAIN_HEAVY_LANDING);
-                if (!check_fall_damage(m, ACT_HARD_BACKWARD_GROUND_KB)) {
+                
+                another_dive = TRUE;
+                another_ground_pound = TRUE;
+                  
+                if (!check_fall_damage(m, ACT_HARD_BACKWARD_GROUND_KB)) 
+                {
                     m->particleFlags |= PARTICLE_MIST_CIRCLE | PARTICLE_HORIZONTAL_STAR;
                     set_mario_action(m, ACT_GROUND_POUND_LAND, 0);
                 }
             }
+
             set_camera_shake_from_hit(SHAKE_GROUND_POUND);
-        } else if (stepResult == AIR_STEP_HIT_WALL) {
+        } 
+        else if (stepResult == AIR_STEP_HIT_WALL) 
+        {
             mario_set_forward_vel(m, -16.0f);
-            if (m->vel[1] > 0.0f) {
+
+            if (m->vel[1] > 0.0f) 
+            {
                 m->vel[1] = 0.0f;
             }
 
@@ -2045,6 +2131,10 @@ s32 act_special_triple_jump(struct MarioState *m) {
 
 s32 check_common_airborne_cancels(struct MarioState *m) {
     if (m->pos[1] < m->waterLevel - 100) {
+        
+        another_dive = TRUE;
+        another_ground_pound = TRUE;
+
         return set_water_plunge_action(m);
     }
 
